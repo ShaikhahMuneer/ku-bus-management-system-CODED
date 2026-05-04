@@ -27,18 +27,17 @@ connectDB();
 const allowedOrigins = [
   process.env.CLIENT_URL,
   "https://ku-bus-management-system.vercel.app",
-  "https://ku-bus-management-system-gu4066c6j-shaikhahmuneers-projects.vercel.app"
 ];
 
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error("CORS not allowed"));
+    if (!origin || allowedOrigins.includes(origin) || origin.endsWith(".vercel.app")) {
+      return callback(null, true);
     }
+
+    return callback(new Error("CORS not allowed"));
   },
-  credentials: true
+  credentials: true,
 }));
 
 app.use(express.json());
