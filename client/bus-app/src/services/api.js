@@ -1,5 +1,4 @@
-const API_BASE_URL =
-  process.env.REACT_APP_API_URL || "http://localhost:3001/api";
+const API_BASE_URL = "https://ku-bus-management-system.onrender.com/api";
 
 const getToken = () => localStorage.getItem("busToken");
 
