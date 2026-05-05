@@ -1,114 +1,62 @@
-import React, { useState } from "react";
-import { authApi } from "../../services/api";
+router.post("/forgot-password", async (req, res) => {
+  try {
+    console.log("FORGOT PASSWORD REQUEST:", req.body);
 
-function ForgotPasswordPage({ setPage }) {
-  const [email, setEmail] = useState("");
-  const [otpSent, setOtpSent] = useState(false);
-  const [otp, setOtp] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+    const { email } = req.body;
 
-  const handleSendOtp = async () => {
-    if (!email || !email.endsWith("@ku.edu.kw")) {
-      alert("Please enter a valid KU email.");
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      await authApi.forgotPassword(email);
-      setOtpSent(true);
-      alert("OTP sent to your KU email.");
-    } catch (error) {
-      alert(error.message || "Could not send OTP.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleResetPassword = async () => {
-    if (!otp || !newPassword) {
-      alert("Please enter OTP and new password.");
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-
-      await authApi.resetPassword({
-        email,
-        otp,
-        newPassword,
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required.",
       });
-
-      alert("Password reset successfully.");
-      setPage("login");
-    } catch (error) {
-      alert(error.message || "Could not reset password.");
-    } finally {
-      setIsLoading(false);
     }
-  };
 
-  return (
-    <div className="auth-screen">
-      <div className="auth-card forgot-card">
-        <p className="back-link" onClick={() => setPage("login")}>
-          ← Back to Login
-        </p>
+    const kuEmailRegex = /^[a-zA-Z0-9._%+-]+@ku\.edu\.kw$/;
 
-        <h1 className="forgot-title">Reset Password</h1>
+    if (!kuEmailRegex.test(email)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid KU email.",
+      });
+    }
 
-        <p className="forgot-subtitle">
-          Enter your KU email to receive an OTP
-        </p>
+    const user = await User.findOne({ email });
 
-        <label>KU Email</label>
-        <input
-          className="input"
-          type="email"
-          placeholder="s2231172129@ku.edu.kw or name@ku.edu.kw"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          disabled={otpSent}
-        />
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "No account found with this email.",
+      });
+    }
 
-        {!otpSent ? (
-          <button className="main-btn" onClick={handleSendOtp} disabled={isLoading}>
-            {isLoading ? "Sending..." : "Send OTP"}
-          </button>
-        ) : (
-          <>
-            <label>OTP</label>
-            <input
-              className="input"
-              type="text"
-              placeholder="Enter 6-digit OTP"
-              value={otp}
-              onChange={(e) => setOtp(e.target.value)}
-            />
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-            <label>New Password</label>
-            <input
-              className="input"
-              type="password"
-              placeholder="Enter new password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-            />
+    user.resetPasswordOtp = otp;
+    user.resetPasswordOtpExpires = Date.now() + 10 * 60 * 1000;
 
-            <button
-              className="main-btn"
-              onClick={handleResetPassword}
-              disabled={isLoading}
-            >
-              {isLoading ? "Resetting..." : "Reset Password"}
-            </button>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
+    await user.save();
 
-export default ForgotPasswordPage;
+    console.log("OTP CREATED:", otp);
+    console.log("ABOUT TO SEND EMAIL TO:", email);
+
+    await sendEmail({
+      to: email,
+      subject: "University Bus System Password Reset OTP",
+      text: `Your OTP code is ${otp}. It will expire in 10 minutes.`,
+    });
+
+    console.log("EMAIL SENT SUCCESSFULLY");
+
+    return res.status(200).json({
+      success: true,
+      message: "OTP sent to your KU email.",
+    });
+  } catch (error) {
+    console.error("FORGOT PASSWORD ERROR:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to send OTP.",
+    });
+  }
+});
